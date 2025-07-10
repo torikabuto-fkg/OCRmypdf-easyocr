@@ -1,0 +1,90 @@
+# Python 3.11 と venv モジュールのインストール
+# 1) リポジトリ情報を最新化＆deadsnakes PPA を追加
+sudo apt update
+sudo apt install -y software-properties-common apt-transport-https ca-certificates
+sudo add-apt-repository ppa:deadsnakes/ppa
+sudo apt update
+
+# 2) Python 3.11 本体と venv 用パッケージをインストール
+sudo apt install -y python3.11 python3.11-venv python3.11-distutils
+
+# 新しい venv を作成・アクティベート
+# 作業ディレクトリに移動（例ではカレントに .venv を作ります）
+cd /mnt/c/Users/torik/desktop
+
+# 既存の .venv を削除しておく（必要なら）
+rm -rf .venv
+
+# Python 3.11 で venv を作成
+python3.11 -m venv .venv
+
+
+# 1) 仮想環境を有効化
+cd /mnt/c/Users/torik/desktop
+source .venv/bin/activate
+
+# 2) pip を最新化
+pip install --upgrade pip
+
+# 1) 先に依存パッケージを正しいバージョンで入れる
+pip install "numpy<2.0" "opencv-python-headless<4.12.0"
+
+# 2) easyocr/ocrmypdf-easyocr は依存解決をスキップ
+pip install --no-deps easyocr ocrmypdf ocrmypdf-easyocr
+
+# WSL2上にCUDAツールキット＆cuDNNをインストール or NVIDIA のサイトから cuDNN の Debian パッケージを取得する
+sudo apt update
+sudo apt install -y software-properties-common curl
+sudo curl -fsSL https://developer.download.nvidia.com/compute/cuda/repos/ubuntu$(. /etc/os-release; echo $VERSION_ID)/x86_64/cuda-keyring_1.0-1_all.deb -o cuda-keyring.deb
+sudo dpkg -i cuda-keyring.deb
+sudo apt update
+sudo apt install -y cuda-toolkit-11-7 libcudnn8 libcudnn8-dev
+
+# 4) CUDA 11.7 対応の安定版 PyTorch をインストール
+#    （Python 3.11 環境なら安定版ホイールが使えます）
+pip install torch torchvision torchaudio \
+  --index-url https://download.pytorch.org/whl/cu117
+
+# 5) GPU がちゃんと認識されるかテスト
+python - <<'EOF'
+import torch
+print("CUDA available:", torch.cuda.is_available())
+if torch.cuda.is_available():
+    print("Using device [0]:", torch.cuda.get_device_name(0))
+EOF
+
+# ───────────────────────────────────────────────────────────
+# 6) 必要なら特定 GPU のみを使う
+#    （0番以外を使いたい場合は適宜番号を変えてください）
+export CUDA_VISIBLE_DEVICES=0
+
+# 7) OCRmyPDF を GPU + EasyOCR で実行
+ocrmypdf \
+  --plugin easyocr \
+  --easyocr-batch-size 4 \   
+  --jobs 1 \
+  -l jpn+eng \
+  "input.pdf" \
+  output.pdf
+
+
+# easyocr-batch-size 4：4ページ分の画像を一度に GPU へ渡す
+
+# jobs 1：OCRmyPDF 側のスレッド数を 1 に絞り、GPU 連続投入のタイミングを揃える
+
+"""
+GPU／メモリが飽和してしまう場合、以下のポイントを抑えると安定して GPU コアを動かせるようになります。
+
+並列ジョブ数を絞る
+OCRmyPDF はデフォルトで複数ページを並列処理しますが、WSL2 環境ではメモリを大量に消費しがちです。まずは --jobs 1 でスレッド数を１に固定し、ページ変換の同時実行を抑えましょう。
+
+バッチサイズを下げる
+EasyOCR 側も同じく一度に送るページ数を減らすと GPU メモリのフットプリントが小さくなります。--easyocr-batch-size 1 か 2 あたりから試してみてください。
+
+画像解像度を落とす
+PDF→画像変換時の DPI を下げると画像データ自体が小さくなり、GPU・CPU 両方のメモリ使用量が減ります。--image-dpi 200 （または 150）程度を目安に。
+
+最大画素数を制限する
+極端に大きなページ画像があると一気にメモリを食うので、--max-image-mpixels 20 のように上限を設定してみてください。
+"""
+
