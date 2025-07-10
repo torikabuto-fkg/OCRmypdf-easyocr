@@ -1,0 +1,32 @@
+# 1) 不正な CUDA リポジトリを削除
+sudo rm -f /etc/apt/sources.list.d/cuda.list
+
+# 2) 新しい仮想環境 "tesseract" を作成＆アクティベート
+python3 -m venv ~/tesseract
+source ~/tesseract/bin/activate
+
+# 3) pip と OCRmyPDF のインストール
+pip install --upgrade pip
+pip install ocrmypdf
+
+# 4) Tesseract OCR 本体と日本語／英語言語パックをシステムへインストール
+sudo apt update
+sudo apt install -y tesseract-ocr tesseract-ocr-jpn tesseract-ocr-eng
+
+# 5) 縦書き用 jpn_vert モデルを取得＆配置
+wget -q https://github.com/tesseract-ocr/tessdata/raw/4.1.0/jpn_vert.traineddata -O /tmp/jpn_vert.traineddata
+sudo cp /tmp/jpn_vert.traineddata /usr/share/tesseract-ocr/5/tessdata/jpn_vert.traineddata
+
+# 6) best モデルを含む tessdata_best をクローン＆配置
+rm -rf /tmp/tessdata_best
+git clone --depth 1 https://github.com/tesseract-ocr/tessdata_best.git /tmp/tessdata_best
+sudo cp /tmp/tessdata_best/jpn.traineddata /usr/share/tesseract-ocr/5/tessdata/jpn.traineddata
+sudo cp /tmp/tessdata_best/eng.traineddata /usr/share/tesseract-ocr/5/tessdata/eng.traineddata
+
+# 7) 一時ファイルをクリーンアップ
+rm -rf /tmp/tessdata_best /tmp/jpn_vert.traineddata
+
+# 8) インストール済み言語を確認
+tesseract --list-langs
+
+ocrmypdf  -l jpn+eng  　input.pdf   output.pdf
