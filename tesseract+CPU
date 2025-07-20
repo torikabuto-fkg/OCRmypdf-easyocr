@@ -30,3 +30,7 @@ rm -rf /tmp/tessdata_best /tmp/jpn_vert.traineddata
 tesseract --list-langs
 
 ocrmypdf  -l jpn+eng  　input.pdf   output.pdf
+
+
+仮想環境から出る
+deactivate
