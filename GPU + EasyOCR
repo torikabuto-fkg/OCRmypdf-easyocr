@@ -61,6 +61,7 @@ export CUDA_VISIBLE_DEVICES=0
 # 7) OCRmyPDF を GPU + EasyOCR で実行
 ocrmypdf \
   --plugin easyocr \
+  --pdf-renderer sandwich \  
   --easyocr-batch-size 4 \   
   --jobs 1 \
   -l jpn+eng \
